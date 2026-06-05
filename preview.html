@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chromatique 16 | 双击预览</title>
+    <style>
+      :root {
+        --ink: #233236;
+        --muted: #63787d;
+        --line: rgba(75, 119, 127, 0.18);
+        --aqua: #81d8cf;
+        --shadow: 0 24px 70px rgba(65, 104, 111, 0.16);
+        --soft-shadow: 0 14px 40px rgba(85, 129, 138, 0.12);
+        color: var(--ink);
+        font-family: "Avenir Next", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-width: 320px;
+        min-height: 100vh;
+        overflow-x: hidden;
+        background:
+          linear-gradient(135deg, rgba(129, 216, 207, 0.28), transparent 32%),
+          linear-gradient(225deg, rgba(157, 204, 237, 0.26), transparent 36%),
+          linear-gradient(315deg, rgba(239, 169, 160, 0.18), transparent 34%),
+          linear-gradient(180deg, #fbfefd 0%, #eef8f6 48%, #f8f2ee 100%);
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: -2;
+        background-image:
+          linear-gradient(rgba(255, 255, 255, 0.52) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.5) 1px, transparent 1px);
+        background-size: 56px 56px;
+        mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.75), transparent 72%);
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1,
+      h2 {
+        font-family: "Optima", "Avenir Next", "PingFang SC", serif;
+        font-weight: 600;
+      }
+
+      h1 {
+        margin-bottom: 18px;
+        color: #163439;
+        font-size: clamp(2.8rem, 7vw, 6.6rem);
+        line-height: 0.98;
+      }
+
+      h2 {
+        margin-bottom: 14px;
+        font-size: clamp(1.7rem, 3.4vw, 3.2rem);
+        line-height: 1.08;
+      }
+
+      button,
+      textarea {
+        font: inherit;
+      }
+
+      .shell {
+        width: min(1480px, 100%);
+        margin: 0 auto;
+        padding: clamp(18px, 3.6vw, 56px);
+        position: relative;
+      }
+
+      .particle {
+        position: fixed;
+        left: var(--x);
+        top: var(--y);
+        width: var(--s);
+        height: var(--s);
+        border-radius: 50%;
+        z-index: -1;
+        background: rgba(70, 143, 151, 0.34);
+        box-shadow: 0 0 16px rgba(129, 216, 207, 0.32);
+        animation: float 8s ease-in-out infinite;
+        animation-delay: var(--d);
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(260px, 0.86fr) minmax(330px, 430px) minmax(0, 1.2fr);
+        gap: clamp(16px, 2.2vw, 28px);
+        align-items: stretch;
+      }
+
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background:
+          linear-gradient(145deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.42)),
+          rgba(255, 255, 255, 0.42);
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(24px);
+        padding: clamp(20px, 3vw, 34px);
+      }
+
+      .intro,
+      .result {
+        min-height: 720px;
+      }
+
+      .intro {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+
+      .eyebrow {
+        color: #316a72;
+        font-size: 0.76rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      p,
+      .helper,
+      .note {
+        color: var(--muted);
+        line-height: 1.78;
+      }
+
+      .notes {
+        display: grid;
+        gap: 10px;
+        margin: 28px 0;
+      }
+
+      .notes span,
+      .tag,
+      .upload-action,
+      .avoid span {
+        min-height: 40px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.46);
+        color: #315960;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+      }
+
+      .ribbon {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 8px;
+        margin-top: 42px;
+      }
+
+      .ribbon span {
+        height: clamp(88px, 11vw, 160px);
+        border: 1px solid rgba(255, 255, 255, 0.72);
+        border-radius: 8px;
+        box-shadow: var(--soft-shadow);
+      }
+
+      .upload {
+        display: grid;
+        gap: 12px;
+        margin: 22px 0 12px;
+        cursor: pointer;
+      }
+
+      .upload input {
+        display: none;
+      }
+
+      .upload-box,
+      .preview {
+        width: 100%;
+        aspect-ratio: 0.88;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background:
+          linear-gradient(145deg, rgba(255, 255, 255, 0.68), rgba(209, 241, 238, 0.28)),
+          rgba(255, 255, 255, 0.36);
+      }
+
+      .upload-box {
+        display: grid;
+        place-items: center;
+        align-content: center;
+        gap: 10px;
+        padding: 26px;
+        text-align: center;
+      }
+
+      .preview {
+        display: none;
+        object-fit: cover;
+      }
+
+      .upload-action {
+        justify-content: center;
+      }
+
+      label.field {
+        display: grid;
+        gap: 8px;
+        margin-top: 22px;
+        color: #41676f;
+      }
+
+      textarea {
+        width: 100%;
+        min-height: 162px;
+        resize: vertical;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 16px;
+        background: rgba(255, 255, 255, 0.52);
+        color: var(--ink);
+        line-height: 1.7;
+        outline-color: #4a9aa3;
+      }
+
+      button {
+        width: 100%;
+        min-height: 52px;
+        margin-top: 18px;
+        border: 0;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #2f6f78, #68b9b5);
+        color: #ffffff;
+        cursor: pointer;
+        box-shadow: 0 14px 32px rgba(63, 137, 145, 0.24);
+      }
+
+      .result-head {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 108px;
+        gap: 18px;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 24px;
+      }
+
+      .ring {
+        width: 108px;
+        aspect-ratio: 1;
+        border: 1px solid rgba(74, 154, 163, 0.34);
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        align-content: center;
+        color: #2f6f78;
+        background: rgba(255, 255, 255, 0.6);
+        box-shadow: var(--soft-shadow);
+      }
+
+      .ring strong {
+        font-size: 1.8rem;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 18px;
+      }
+
+      .block {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 16px;
+        background: rgba(255, 255, 255, 0.38);
+      }
+
+      .row {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 0;
+        border-top: 1px solid var(--line);
+      }
+
+      .swatches {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 12px;
+      }
+
+      .swatch {
+        display: grid;
+        grid-template-columns: 42px minmax(0, 1fr);
+        gap: 12px;
+        align-items: center;
+        min-height: 64px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px;
+        background: rgba(255, 255, 255, 0.36);
+      }
+
+      .chip {
+        width: 42px;
+        aspect-ratio: 1;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.82);
+      }
+
+      .avoid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      @keyframes float {
+        50% {
+          transform: translate3d(18px, -24px, 0);
+          opacity: 0.72;
+        }
+      }
+
+      @media (max-width: 1120px) {
+        .layout {
+          grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+        }
+
+        .intro {
+          grid-column: 1 / -1;
+          min-height: auto;
+        }
+      }
+
+      @media (max-width: 760px) {
+        .shell {
+          padding: 14px;
+        }
+
+        .layout,
+        .grid,
+        .swatches,
+        .result-head {
+          grid-template-columns: 1fr;
+        }
+
+        .intro,
+        .result {
+          min-height: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="layout">
+        <aside class="panel intro">
+          <div>
+            <span class="eyebrow">Chromatique 16</span>
+            <h1>找到让你气色变干净的颜色</h1>
+            <p>有些颜色一上身，人会显得轻松；有些颜色明明好看，贴近脸却容易累。</p>
+            <div class="notes">
+              <span>自然光更准</span>
+              <span>看气色，不看滤镜</span>
+              <span>照片不落盘</span>
+            </div>
+          </div>
+          <div class="ribbon" aria-hidden="true">
+            <span style="background:#d7efe9"></span>
+            <span style="background:#f4d7d2"></span>
+            <span style="background:#f7edc9"></span>
+            <span style="background:#b7d9f3"></span>
+            <span style="background:#c8c0e8"></span>
+          </div>
+        </aside>
+
+        <section class="panel">
+          <span class="eyebrow">先从真实的你开始</span>
+          <h2>放一张平时的照片，或写几句你的穿衣感受</h2>
+          <p class="helper">素颜、淡妆都可以。重点是光线干净，别让滤镜替你决定肤色。</p>
+          <label class="upload">
+            <input id="photo" accept="image/png,image/jpeg,image/webp" type="file" />
+            <img id="preview" class="preview" alt="上传预览" />
+            <div id="empty" class="upload-box">
+              <strong>放一张日常照片</strong>
+              <span>窗边光、少修图、能看到发色和眼睛就很好</span>
+            </div>
+            <span id="fileName" class="upload-action">选择一张照片</span>
+          </label>
+          <label class="field">
+            也可以补充你的直觉
+            <textarea>自然黑发，棕黑眼睛。穿冷粉会显灰，橄榄绿和砖红比较有精神。</textarea>
+          </label>
+          <button id="showResult" type="button">看看适合我的颜色</button>
+        </section>
+
+        <section id="result" class="panel result">
+          <div class="result-head">
+            <div>
+              <span class="eyebrow">你的色彩方向</span>
+              <h2>秋季 / 深秋</h2>
+              <p>颜色需要有一点厚度和暖意，太冷太轻的颜色容易让脸色发灰。</p>
+            </div>
+            <div class="ring"><strong>78%</strong><span>资料完整度</span></div>
+          </div>
+          <div class="grid">
+            <div class="block">
+              <h3>怎么看出来的</h3>
+              <div class="row"><span>冷暖</span><strong>偏暖</strong></div>
+              <div class="row"><span>明度</span><strong>中深</strong></div>
+              <div class="row"><span>彩度</span><strong>中等</strong></div>
+              <div class="row"><span>对比度</span><strong>中高</strong></div>
+            </div>
+            <div class="block">
+              <h3>贴近生活的线索</h3>
+              <p>棕调、橄榄调、焦糖感的颜色更容易把气色托起来。冷粉、冰蓝和银灰靠近脸时容易显累。</p>
+            </div>
+          </div>
+          <h3 style="margin-top:22px">可以先试这些颜色</h3>
+          <div class="swatches">
+            <div class="swatch"><span class="chip" style="background:#3B2418"></span><div><strong>浓咖啡</strong><br /><span>外套、皮具、眼线</span></div></div>
+            <div class="swatch"><span class="chip" style="background:#68613D"></span><div><strong>橄榄褐</strong><br /><span>风衣、半裙</span></div></div>
+            <div class="swatch"><span class="chip" style="background:#9A3E2E"></span><div><strong>铁锈红</strong><br /><span>口红、丝巾</span></div></div>
+            <div class="swatch"><span class="chip" style="background:#0E5A50"></span><div><strong>深孔雀绿</strong><br /><span>连衣裙、耳饰</span></div></div>
+          </div>
+          <div class="grid">
+            <div class="block"><h3>衣柜可以这样选</h3><p>浓咖啡西装配奶油米内搭；橄榄褐风衣加铁锈红唇色；深孔雀绿针织配暖炭灰半裙。</p></div>
+            <div class="block"><h3>先少大面积贴脸</h3><div class="avoid"><span>冰粉色</span><span>荧光蓝紫</span><span>纯黑白强对比</span></div></div>
+          </div>
+          <p class="note">这是双击 HTML 的静态预览，不会调用后端，也不会保存照片。</p>
+        </section>
+      </section>
+    </main>
+    <script>
+      for (let i = 0; i < 30; i += 1) {
+        const dot = document.createElement("span");
+        dot.className = "particle";
+        dot.style.setProperty("--x", `${(i * 37) % 100}%`);
+        dot.style.setProperty("--y", `${(i * 53) % 100}%`);
+        dot.style.setProperty("--s", `${3 + (i % 5)}px`);
+        dot.style.setProperty("--d", `${(i % 9) * -0.7}s`);
+        document.body.appendChild(dot);
+      }
+
+      const photo = document.getElementById("photo");
+      const preview = document.getElementById("preview");
+      const empty = document.getElementById("empty");
+      const fileName = document.getElementById("fileName");
+      photo.addEventListener("change", () => {
+        const file = photo.files && photo.files[0];
+        if (!file) return;
+        preview.src = URL.createObjectURL(file);
+        preview.style.display = "block";
+        empty.style.display = "none";
+        fileName.textContent = file.name;
+      });
+
+      document.getElementById("showResult").addEventListener("click", () => {
+        document.getElementById("result").scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    </script>
+  </body>
+</html>
+
